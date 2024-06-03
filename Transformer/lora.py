@@ -35,7 +35,7 @@ model_checkpoint = "bert-base-uncased"
 lr = 1e-4
 batch_size = 16
 num_epochs = 1000
-load_model=False
+load_model=True
 #output_dir = 'kwwww/test_16_2000'
 r_=1
 lora_alpha=16
@@ -108,11 +108,12 @@ model = AutoModelForSequenceClassification.from_pretrained(
     model_checkpoint, num_labels=2, id2label=id2label, label2id=label2id
 )
 '''
+
 original_model_name = 'bert-base-uncased'
 original_config = BertConfig.from_pretrained(original_model_name)
 custom_config = BertConfig(
     vocab_size=original_config.vocab_size,
-    hidden_size=32,
+    hidden_size=128,
     num_hidden_layers=6,
     num_attention_heads=8,
     intermediate_size=original_config.intermediate_size,
@@ -126,7 +127,7 @@ custom_config = BertConfig(
 model = BertForSequenceClassification(custom_config)
 
 main_path = f'Transformer/LoRA_hidden_size-{custom_config.hidden_size}/'
-load_path = main_path + 'save/model_weights_epoch4.pth'
+load_path = main_path + 'model_weights_epoch4.pth'
 
 def init_weights(module):
     if isinstance(module, (nn.Linear, nn.Embedding)):
@@ -137,9 +138,14 @@ def init_weights(module):
     if isinstance(module, nn.Linear) and module.bias is not None:
         module.bias.data.zero_()
 
-print(":====> reinit")
-model.apply(init_weights)
+#print(":====> reinit")
+#model.apply(init_weights)
 
+checkpoint_folder = os.path.join(main_path, "checkpoint-315000/")
+
+model = AutoModelForSequenceClassification.from_pretrained(
+    checkpoint_folder, config=custom_config
+)
 #model.load_state_dict(torch.load(load_path))
 
 class CustomCallback:
@@ -183,7 +189,12 @@ training_args = TrainingArguments(
     save_total_limit=5,
     load_best_model_at_end=True
 )
+
+# Load Checkpoint
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
+optimizer_path = os.path.join(checkpoint_folder, "optimizer.pt")
+optimizer.load_state_dict(torch.load(optimizer_path))
+
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -196,98 +207,8 @@ trainer = Trainer(
     callbacks=[CustomCallback(model)],
 )
 
-trainer.train()
-
-output_dir_1 = os.path.join(main_path, "model_weights_epoch4.pth")
-torch.save(model.state_dict(), output_dir_1)
-
-
-"""
-16
-"""
-
-custom_config.hidden_size = 16
-model = BertForSequenceClassification(custom_config)
-
-main_path = f'Transformer/LoRA_hidden_size-{custom_config.hidden_size}/'
-load_path = main_path + 'save/model_weights_epoch4.pth'
-
-print(":====> reinit")
-model.apply(init_weights)
-
-#model.load_state_dict(torch.load(load_path))
-
-training_args = TrainingArguments(
-    output_dir=main_path,
-    learning_rate=lr,
-    per_device_train_batch_size=batch_size,
-    per_device_eval_batch_size=batch_size,
-    num_train_epochs=num_epochs,
-    weight_decay=0.01,
-    evaluation_strategy="epoch",
-    save_strategy="epoch",
-    save_total_limit=5,
-    load_best_model_at_end=True
-)
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=tokenized_bionlp["train"],
-    eval_dataset=tokenized_bionlp["test"],
-    tokenizer=tokenizer,
-    data_collator=data_collator,
-    compute_metrics=compute_metrics,
-    optimizers=(optimizer, None),
-    callbacks=[CustomCallback(model)],
-)
-
-trainer.train()
-
-output_dir_1 = os.path.join(main_path, "model_weights_epoch4.pth")
-torch.save(model.state_dict(), output_dir_1)
-
-"""
-128
-"""
-
-custom_config.hidden_size = 128
-model = BertForSequenceClassification(custom_config)
-
-main_path = f'Transformer/LoRA_hidden_size-{custom_config.hidden_size}/'
-load_path = main_path + 'save/model_weights_epoch4.pth'
-
-print(":====> reinit")
-model.apply(init_weights)
-
-#model.load_state_dict(torch.load(load_path))
-
-training_args = TrainingArguments(
-    output_dir=main_path,
-    learning_rate=lr,
-    per_device_train_batch_size=batch_size,
-    per_device_eval_batch_size=batch_size,
-    num_train_epochs=num_epochs,
-    weight_decay=0.01,
-    evaluation_strategy="epoch",
-    save_strategy="epoch",
-    save_total_limit=5,
-    load_best_model_at_end=True
-)
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=tokenized_bionlp["train"],
-    eval_dataset=tokenized_bionlp["test"],
-    tokenizer=tokenizer,
-    data_collator=data_collator,
-    compute_metrics=compute_metrics,
-    optimizers=(optimizer, None),
-    callbacks=[CustomCallback(model)],
-)
-
-trainer.train()
+# Resume from Checkpoint ENABLED
+trainer.train(resume_from_checkpoint=checkpoint_folder)
 
 output_dir_1 = os.path.join(main_path, "model_weights_epoch4.pth")
 torch.save(model.state_dict(), output_dir_1)

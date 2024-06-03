@@ -3,7 +3,7 @@ import json
 import matplotlib.pyplot as plt
 
 # Directory containing the saved checkpoint files
-checkpoint_dir = "Transformer/LoRA_hidden_size-32/checkpoint-1337500/"
+checkpoint_dir = "Transformer/LoRA_hidden_size-128/checkpoint-315000/"
 
 # Path to the directory containing the trainer_state.json file
 trainer_state_path = os.path.join(checkpoint_dir, "trainer_state.json")
